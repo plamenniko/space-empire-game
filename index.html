@@ -13,9 +13,7 @@
       background: black;
       color: white;
     }
-    canvas {
-      display: block;
-    }
+    canvas { display: block; }
     #hud {
       position: fixed;
       top: 10px;
@@ -35,9 +33,11 @@
 
 <div id="hud">
   🌌 Galaxy View<br>
-  🟢 Green = Your Fleet<br>
-  ⚪ White = Stars<br>
-  Click star → move fleet<br>
+  🟢 Your Fleet<br>
+  ⚪ Stars<br>
+  Click = preview order<br>
+  Click again = confirm<br>
+  ESC = cancel order<br>
   Drag = Pan | Wheel = Zoom<br>
   SPACE = Pause
 </div>
@@ -50,12 +50,8 @@ const Simulation = {
   paused: false,
   time: 0,
   stars: [],
-  fleets: [],
-  camera: {
-    x: 0,
-    y: 0,
-    zoom: 1
-  }
+  camera: { x: 0, y: 0, zoom: 1 },
+  pendingOrder: null
 };
 
 /* =========================
@@ -72,13 +68,12 @@ window.addEventListener("resize", resize);
 resize();
 
 /* =========================
-   GALAXY GENERATION
+   GALAXY
 ========================= */
 function generateGalaxy(count = 120) {
   Simulation.stars = [];
   for (let i = 0; i < count; i++) {
     Simulation.stars.push({
-      id: i,
       x: Math.random() * 4000 - 2000,
       y: Math.random() * 4000 - 2000
     });
@@ -87,27 +82,22 @@ function generateGalaxy(count = 120) {
 generateGalaxy();
 
 /* =========================
-   PLAYER FLEET (START CENTER)
+   PLAYER FLEET
 ========================= */
-const playerFleet = {
+const fleet = {
   x: 0,
   y: 0,
   target: null,
   speed: 300
 };
 
-Simulation.fleets.push(playerFleet);
-
-/* Center camera on player at start */
-Simulation.camera.x = playerFleet.x;
-Simulation.camera.y = playerFleet.y;
+Simulation.camera.x = fleet.x;
+Simulation.camera.y = fleet.y;
 
 /* =========================
-   INPUT
+   INPUT — CAMERA
 ========================= */
-let dragging = false;
-let lastX = 0;
-let lastY = 0;
+let dragging = false, lastX = 0, lastY = 0;
 
 canvas.addEventListener("mousedown", e => {
   dragging = true;
@@ -133,29 +123,28 @@ canvas.addEventListener("wheel", e => {
   Simulation.camera.zoom = Math.max(0.3, Math.min(4, Simulation.camera.zoom));
 }, { passive: false });
 
-window.addEventListener("keydown", e => {
-  if (e.code === "Space") Simulation.paused = !Simulation.paused;
-});
-
 /* =========================
-   CLICK STAR → MOVE FLEET
+   INPUT — COMMANDS
 ========================= */
 canvas.addEventListener("click", e => {
-  const mx =
+  const wx =
     (e.clientX - canvas.width / 2) / Simulation.camera.zoom +
     Simulation.camera.x;
-  const my =
+  const wy =
     (e.clientY - canvas.height / 2) / Simulation.camera.zoom +
     Simulation.camera.y;
 
-  for (const star of Simulation.stars) {
-    const dx = star.x - mx;
-    const dy = star.y - my;
-    if (Math.sqrt(dx * dx + dy * dy) < 15) {
-      playerFleet.target = star;
-      break;
-    }
+  if (!Simulation.pendingOrder) {
+    Simulation.pendingOrder = { x: wx, y: wy };
+  } else {
+    fleet.target = Simulation.pendingOrder;
+    Simulation.pendingOrder = null;
   }
+});
+
+window.addEventListener("keydown", e => {
+  if (e.code === "Space") Simulation.paused = !Simulation.paused;
+  if (e.code === "Escape") Simulation.pendingOrder = null;
 });
 
 /* =========================
@@ -167,65 +156,63 @@ function loop(now) {
   const dt = (now - lastTime) / 1000;
   lastTime = now;
 
-  if (!Simulation.paused && playerFleet.target) {
-    const dx = playerFleet.target.x - playerFleet.x;
-    const dy = playerFleet.target.y - playerFleet.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+  if (!Simulation.paused && fleet.target) {
+    const dx = fleet.target.x - fleet.x;
+    const dy = fleet.target.y - fleet.y;
+    const dist = Math.hypot(dx, dy);
 
     if (dist < 5) {
-      playerFleet.x = playerFleet.target.x;
-      playerFleet.y = playerFleet.target.y;
-      playerFleet.target = null;
+      fleet.x = fleet.target.x;
+      fleet.y = fleet.target.y;
+      fleet.target = null;
     } else {
-      playerFleet.x += (dx / dist) * playerFleet.speed * dt;
-      playerFleet.y += (dy / dist) * playerFleet.speed * dt;
+      fleet.x += (dx / dist) * fleet.speed * dt;
+      fleet.y += (dy / dist) * fleet.speed * dt;
     }
   }
 
   ctx.fillStyle = "black";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  /* Draw Stars */
+  /* Stars */
   ctx.fillStyle = "white";
-  for (const star of Simulation.stars) {
-    const sx =
-      (star.x - Simulation.camera.x) * Simulation.camera.zoom +
-      canvas.width / 2;
-    const sy =
-      (star.y - Simulation.camera.y) * Simulation.camera.zoom +
-      canvas.height / 2;
-
+  for (const s of Simulation.stars) {
+    const sx = (s.x - Simulation.camera.x) * Simulation.camera.zoom + canvas.width / 2;
+    const sy = (s.y - Simulation.camera.y) * Simulation.camera.zoom + canvas.height / 2;
     ctx.beginPath();
     ctx.arc(sx, sy, 4, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  /* Draw Player Fleet */
-  const fx =
-    (playerFleet.x - Simulation.camera.x) * Simulation.camera.zoom +
-    canvas.width / 2;
-  const fy =
-    (playerFleet.y - Simulation.camera.y) * Simulation.camera.zoom +
-    canvas.height / 2;
+  /* Pending Order Arrow */
+  if (Simulation.pendingOrder) {
+    const px = (Simulation.pendingOrder.x - Simulation.camera.x) * Simulation.camera.zoom + canvas.width / 2;
+    const py = (Simulation.pendingOrder.y - Simulation.camera.y) * Simulation.camera.zoom + canvas.height / 2;
+    const fx = (fleet.x - Simulation.camera.x) * Simulation.camera.zoom + canvas.width / 2;
+    const fy = (fleet.y - Simulation.camera.y) * Simulation.camera.zoom + canvas.height / 2;
+
+    ctx.strokeStyle = "red";
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(fx, fy);
+    ctx.lineTo(px, py);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = "red";
+    ctx.beginPath();
+    ctx.arc(px, py, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /* Fleet */
+  const fx = (fleet.x - Simulation.camera.x) * Simulation.camera.zoom + canvas.width / 2;
+  const fy = (fleet.y - Simulation.camera.y) * Simulation.camera.zoom + canvas.height / 2;
 
   ctx.fillStyle = "lime";
   ctx.beginPath();
   ctx.arc(fx, fy, 8, 0, Math.PI * 2);
   ctx.fill();
-
-  /* Fleet Crosshair */
-  ctx.strokeStyle = "lime";
-  ctx.beginPath();
-  ctx.moveTo(fx - 12, fy);
-  ctx.lineTo(fx + 12, fy);
-  ctx.moveTo(fx, fy - 12);
-  ctx.lineTo(fx, fy + 12);
-  ctx.stroke();
-
-  /* Label */
-  ctx.fillStyle = "lime";
-  ctx.font = "12px sans-serif";
-  ctx.fillText("Your Fleet", fx + 10, fy - 10);
 
   if (Simulation.paused) {
     ctx.fillStyle = "white";
