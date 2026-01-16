@@ -3,25 +3,22 @@
 <head>
 <meta charset="UTF-8" />
 <title>Galaxy View</title>
-
 <style>
 html, body {
   margin: 0;
   padding: 0;
-  width: 100%;
-  height: 100%;
   background: black;
   overflow: hidden;
   font-family: Arial, sans-serif;
   color: white;
 }
 
-canvas {
+#ui {
   position: absolute;
-  left: 0;
-  top: 0;
-  background: black;
-  z-index: 1;
+  top: 10px;
+  left: 220px;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 #fleetPanel {
@@ -33,16 +30,6 @@ canvas {
   background: #0c0f12;
   border-right: 1px solid #222;
   padding: 10px;
-  z-index: 5;
-}
-
-#ui {
-  position: absolute;
-  top: 10px;
-  left: 220px;
-  font-size: 14px;
-  line-height: 1.4;
-  z-index: 5;
 }
 
 .fleetItem {
@@ -58,7 +45,6 @@ canvas {
 }
 </style>
 </head>
-
 <body>
 
 <div id="fleetPanel">
@@ -80,6 +66,9 @@ canvas {
 <canvas id="canvas"></canvas>
 
 <script>
+/* ==========================
+   CANVAS + CAMERA
+========================== */
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
@@ -90,19 +79,27 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-/* CAMERA */
-const camera = { x: 0, y: 0, zoom: 1 };
+const camera = {
+  x: 0,
+  y: 0,
+  zoom: 1
+};
 
-/* WORLD */
+/* ==========================
+   WORLD DATA
+========================== */
 const stars = [];
 for (let i = 0; i < 40; i++) {
   stars.push({
-    x: Math.random() * 2000 - 1000,
-    y: Math.random() * 2000 - 1000
+    x: Math.random() * 4000 - 2000,
+    y: Math.random() * 4000 - 2000,
+    baseSize: 2
   });
 }
 
-/* FLEET */
+/* ==========================
+   FLEET MODEL
+========================== */
 const fleet = {
   x: 0,
   y: 0,
@@ -114,43 +111,56 @@ const fleet = {
 
 let selectedFleet = fleet;
 
-/* CAMERA CENTER */
+/* ==========================
+   CAMERA CENTER
+========================== */
 function centerCameraOnFleet() {
   camera.x = selectedFleet.x;
   camera.y = selectedFleet.y;
 }
 centerCameraOnFleet();
 
-/* INPUT */
-let dragging = false;
+/* ==========================
+   INPUT STATE
+========================== */
+let isDragging = false;
 let lastMouse = { x: 0, y: 0 };
 let previewTarget = null;
 let paused = false;
 
-/* MOUSE */
+/* ==========================
+   MOUSE
+========================== */
 canvas.addEventListener("mousedown", e => {
-  dragging = true;
+  isDragging = true;
   lastMouse.x = e.clientX;
   lastMouse.y = e.clientY;
 });
 
-window.addEventListener("mouseup", () => dragging = false);
+canvas.addEventListener("mouseup", () => {
+  isDragging = false;
+});
 
-window.addEventListener("mousemove", e => {
-  if (!dragging) return;
-  camera.x -= (e.clientX - lastMouse.x) / camera.zoom;
-  camera.y -= (e.clientY - lastMouse.y) / camera.zoom;
-  lastMouse.x = e.clientX;
-  lastMouse.y = e.clientY;
+canvas.addEventListener("mousemove", e => {
+  if (isDragging) {
+    const dx = (e.clientX - lastMouse.x) / camera.zoom;
+    const dy = (e.clientY - lastMouse.y) / camera.zoom;
+    camera.x -= dx;
+    camera.y -= dy;
+    lastMouse.x = e.clientX;
+    lastMouse.y = e.clientY;
+  }
 });
 
 canvas.addEventListener("wheel", e => {
-  e.preventDefault();
-  camera.zoom *= e.deltaY > 0 ? 0.9 : 1.1;
+  const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+  camera.zoom *= zoomFactor;
   camera.zoom = Math.max(0.2, Math.min(5, camera.zoom));
-}, { passive: false });
+});
 
-/* CLICK */
+/* ==========================
+   CLICK → PREVIEW / CONFIRM
+========================== */
 canvas.addEventListener("click", e => {
   const wx = (e.clientX - canvas.width / 2) / camera.zoom + camera.x;
   const wy = (e.clientY - canvas.height / 2) / camera.zoom + camera.y;
@@ -159,92 +169,116 @@ canvas.addEventListener("click", e => {
     previewTarget = { x: wx, y: wy };
   } else {
     selectedFleet.target = { ...previewTarget };
-    const d = Math.hypot(
-      selectedFleet.target.x - selectedFleet.x,
-      selectedFleet.target.y - selectedFleet.y
-    );
-    selectedFleet.eta = d / selectedFleet.speed;
+    const dx = selectedFleet.target.x - selectedFleet.x;
+    const dy = selectedFleet.target.y - selectedFleet.y;
+    const dist = Math.hypot(dx, dy);
+    selectedFleet.eta = dist / selectedFleet.speed;
     selectedFleet.state = "MOVING";
     previewTarget = null;
   }
 });
 
-/* KEYS */
+/* ==========================
+   KEYBOARD
+========================== */
 window.addEventListener("keydown", e => {
   if (e.code === "Escape") previewTarget = null;
   if (e.code === "Space") paused = !paused;
 });
 
-/* PANEL */
+/* ==========================
+   FLEET PANEL
+========================== */
 document.getElementById("fleet1").onclick = () => {
+  selectedFleet = fleet;
+  document.querySelectorAll(".fleetItem").forEach(el => el.classList.remove("active"));
+  document.getElementById("fleet1").classList.add("active");
   centerCameraOnFleet();
 };
 
-/* LOOP */
-let last = performance.now();
-function loop(t) {
-  const dt = (t - last) / 1000;
-  last = t;
+/* ==========================
+   UPDATE LOOP
+========================== */
+let lastTime = performance.now();
+function update(time) {
+  const dt = (time - lastTime) / 1000;
+  lastTime = time;
 
-  if (!paused && fleet.state === "MOVING") {
-    const dx = fleet.target.x - fleet.x;
-    const dy = fleet.target.y - fleet.y;
-    const d = Math.hypot(dx, dy);
+  if (!paused && selectedFleet.state === "MOVING") {
+    const dx = selectedFleet.target.x - selectedFleet.x;
+    const dy = selectedFleet.target.y - selectedFleet.y;
+    const dist = Math.hypot(dx, dy);
 
-    if (d < 1) {
-      fleet.x = fleet.target.x;
-      fleet.y = fleet.target.y;
-      fleet.state = "IDLE";
-      fleet.target = null;
+    if (dist < 1) {
+      selectedFleet.x = selectedFleet.target.x;
+      selectedFleet.y = selectedFleet.target.y;
+      selectedFleet.target = null;
+      selectedFleet.state = "IDLE";
+      selectedFleet.eta = 0;
     } else {
-      fleet.x += (dx / d) * fleet.speed * dt;
-      fleet.y += (dy / d) * fleet.speed * dt;
-      fleet.eta -= dt;
+      selectedFleet.x += (dx / dist) * selectedFleet.speed * dt;
+      selectedFleet.y += (dy / dist) * selectedFleet.speed * dt;
+      selectedFleet.eta -= dt;
     }
   }
 
   draw();
-  requestAnimationFrame(loop);
+  requestAnimationFrame(update);
 }
 
-/* DRAW */
+/* ==========================
+   DRAW
+========================== */
 function draw() {
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  ctx.translate(canvas.width/2, canvas.height/2);
+  ctx.translate(canvas.width / 2, canvas.height / 2);
   ctx.scale(camera.zoom, camera.zoom);
   ctx.translate(-camera.x, -camera.y);
 
-  ctx.fillStyle = "white";
+  /* ⭐ STARS — ZOOM-AWARE SIZE */
   stars.forEach(s => {
+    const size = Math.max(0.5, s.baseSize / camera.zoom);
+    ctx.fillStyle = "white";
     ctx.beginPath();
-    ctx.arc(s.x, s.y, 2, 0, Math.PI*2);
+    ctx.arc(s.x, s.y, size, 0, Math.PI * 2);
     ctx.fill();
   });
 
+  /* PREVIEW LINE */
   if (previewTarget) {
     ctx.strokeStyle = "red";
-    ctx.setLineDash([6,6]);
+    ctx.setLineDash([6, 6]);
     ctx.beginPath();
-    ctx.moveTo(fleet.x, fleet.y);
+    ctx.moveTo(selectedFleet.x, selectedFleet.y);
     ctx.lineTo(previewTarget.x, previewTarget.y);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    ctx.fillStyle = "red";
+    ctx.beginPath();
+    ctx.arc(previewTarget.x, previewTarget.y, 4 / camera.zoom, 0, Math.PI * 2);
+    ctx.fill();
   }
 
+  /* FLEET */
   ctx.fillStyle = "lime";
   ctx.beginPath();
-  ctx.arc(fleet.x, fleet.y, 6, 0, Math.PI*2);
+  ctx.arc(selectedFleet.x, selectedFleet.y, 6 / camera.zoom, 0, Math.PI * 2);
   ctx.fill();
 
-  if (fleet.state === "MOVING") {
-    ctx.fillText(`MOVING (${fleet.eta.toFixed(1)}s)`,
-      fleet.x + 10, fleet.y - 10);
+  if (selectedFleet.state === "MOVING") {
+    ctx.fillStyle = "lime";
+    ctx.fillText(
+      `MOVING (${selectedFleet.eta.toFixed(1)}s)`,
+      selectedFleet.x + 10 / camera.zoom,
+      selectedFleet.y - 10 / camera.zoom
+    );
   }
 }
 
-requestAnimationFrame(loop);
+requestAnimationFrame(update);
 </script>
 </body>
 </html>
