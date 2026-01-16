@@ -1,80 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<title>Galaxy View – Stage 2.1</title>
-
-<style>
-html, body {
-  margin: 0;
-  padding: 0;
-  background: black;
-  overflow: hidden;
-  font-family: Arial, sans-serif;
-  color: white;
-}
-
-#fleetPanel {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 200px;
-  height: 100vh;
-  background: #0c0f12;
-  border-right: 1px solid #222;
-  padding: 10px;
-}
-
-.fleetItem {
-  padding: 8px;
-  margin-bottom: 6px;
-  cursor: pointer;
-  border: 1px solid #222;
-}
-
-.fleetItem.active {
-  border-color: #00ff00;
-  color: #00ff00;
-}
-
-#ui {
-  position: absolute;
-  top: 10px;
-  left: 220px;
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-canvas {
-  display: block;
-}
-</style>
-</head>
-
-<body>
-
-<div id="fleetPanel">
-  <strong>FLEETS</strong>
-  <div id="fleet1" class="fleetItem active">
-    Fleet 1<br><small>IDLE</small>
-  </div>
-</div>
-
-<div id="ui">
-  <strong>Galaxy View</strong><br>
-  Click = preview / confirm<br>
-  ESC = cancel preview<br>
-  SPACE = pause<br>
-  Mouse Drag = Pan<br>
-  Mouse Wheel = Zoom
-</div>
-
-<canvas id="canvas"></canvas>
-
 <script>
-/* ======================================================
-   CANVAS
-====================================================== */
+/* ==========================
+   CANVAS + CAMERA
+========================== */
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
@@ -85,44 +12,27 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-/* ======================================================
-   CAMERA
-====================================================== */
 const camera = {
   x: 0,
   y: 0,
   zoom: 1
 };
 
-/* ======================================================
-   GALAXY STARFIELD (ETERNAL)
-====================================================== */
-const galaxyStars = [];
-const GALAXY_STAR_COUNT = 500;
-
-for (let i = 0; i < GALAXY_STAR_COUNT; i++) {
-  galaxyStars.push({
-    x: Math.random(),
-    y: Math.random(),
-    r: Math.random() * 1.5 + 0.5
+/* ==========================
+   WORLD DATA
+========================== */
+const stars = [];
+for (let i = 0; i < 200; i++) {
+  stars.push({
+    x: Math.random() * 20000 - 10000,
+    y: Math.random() * 20000 - 10000,
+    baseSize: Math.random() * 1.5 + 0.5
   });
 }
 
-/* ======================================================
-   WORLD STARS (SYSTEM SCALE)
-====================================================== */
-const systemStars = [];
-for (let i = 0; i < 40; i++) {
-  systemStars.push({
-    x: Math.random() * 4000 - 2000,
-    y: Math.random() * 4000 - 2000,
-    r: 2
-  });
-}
-
-/* ======================================================
+/* ==========================
    FLEET
-====================================================== */
+========================== */
 const fleet = {
   x: 0,
   y: 0,
@@ -133,25 +43,37 @@ const fleet = {
 };
 
 let selectedFleet = fleet;
+
+/* ==========================
+   CENTER CAMERA
+========================== */
+function centerCameraOnFleet() {
+  camera.x = selectedFleet.x;
+  camera.y = selectedFleet.y;
+}
+centerCameraOnFleet();
+
+/* ==========================
+   INPUT
+========================== */
+let isDragging = false;
+let lastMouse = { x: 0, y: 0 };
 let previewTarget = null;
 let paused = false;
 
-/* ======================================================
-   INPUT
-====================================================== */
-let dragging = false;
-let lastMouse = { x: 0, y: 0 };
-
+/* ==========================
+   MOUSE
+========================== */
 canvas.addEventListener("mousedown", e => {
-  dragging = true;
+  isDragging = true;
   lastMouse.x = e.clientX;
   lastMouse.y = e.clientY;
 });
 
-canvas.addEventListener("mouseup", () => dragging = false);
+canvas.addEventListener("mouseup", () => isDragging = false);
 
 canvas.addEventListener("mousemove", e => {
-  if (!dragging) return;
+  if (!isDragging) return;
   const dx = (e.clientX - lastMouse.x) / camera.zoom;
   const dy = (e.clientY - lastMouse.y) / camera.zoom;
   camera.x -= dx;
@@ -163,9 +85,12 @@ canvas.addEventListener("mousemove", e => {
 canvas.addEventListener("wheel", e => {
   const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
   camera.zoom *= zoomFactor;
-  camera.zoom = Math.max(0.15, Math.min(5, camera.zoom));
+  camera.zoom = Math.max(0.05, Math.min(5, camera.zoom));
 });
 
+/* ==========================
+   CLICK MOVE
+========================== */
 canvas.addEventListener("click", e => {
   const wx = (e.clientX - canvas.width / 2) / camera.zoom + camera.x;
   const wy = (e.clientY - canvas.height / 2) / camera.zoom + camera.y;
@@ -173,25 +98,28 @@ canvas.addEventListener("click", e => {
   if (!previewTarget) {
     previewTarget = { x: wx, y: wy };
   } else {
-    fleet.target = { ...previewTarget };
-    const dx = fleet.target.x - fleet.x;
-    const dy = fleet.target.y - fleet.y;
-    fleet.eta = Math.hypot(dx, dy) / fleet.speed;
-    fleet.state = "MOVING";
+    selectedFleet.target = { ...previewTarget };
+    const dx = selectedFleet.target.x - selectedFleet.x;
+    const dy = selectedFleet.target.y - selectedFleet.y;
+    const dist = Math.hypot(dx, dy);
+    selectedFleet.eta = dist / selectedFleet.speed;
+    selectedFleet.state = "MOVING";
     previewTarget = null;
   }
 });
 
+/* ==========================
+   KEYBOARD
+========================== */
 window.addEventListener("keydown", e => {
   if (e.code === "Escape") previewTarget = null;
   if (e.code === "Space") paused = !paused;
 });
 
-/* ======================================================
-   UPDATE LOOP
-====================================================== */
+/* ==========================
+   UPDATE
+========================== */
 let lastTime = performance.now();
-
 function update(time) {
   const dt = (time - lastTime) / 1000;
   lastTime = time;
@@ -204,8 +132,9 @@ function update(time) {
     if (dist < 1) {
       fleet.x = fleet.target.x;
       fleet.y = fleet.target.y;
-      fleet.state = "IDLE";
       fleet.target = null;
+      fleet.state = "IDLE";
+      fleet.eta = 0;
     } else {
       fleet.x += (dx / dist) * fleet.speed * dt;
       fleet.y += (dy / dist) * fleet.speed * dt;
@@ -217,42 +146,39 @@ function update(time) {
   requestAnimationFrame(update);
 }
 
-/* ======================================================
+/* ==========================
    DRAW
-====================================================== */
+========================== */
 function draw() {
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  /* -------- GALAXY BACKGROUND (NO ZOOM) -------- */
-  ctx.fillStyle = "white";
-  galaxyStars.forEach(s => {
-    ctx.beginPath();
-    ctx.arc(
-      s.x * canvas.width,
-      s.y * canvas.height,
-      s.r,
-      0, Math.PI * 2
-    );
-    ctx.fill();
-  });
-
-  /* -------- WORLD SPACE -------- */
   ctx.translate(canvas.width / 2, canvas.height / 2);
   ctx.scale(camera.zoom, camera.zoom);
   ctx.translate(-camera.x, -camera.y);
 
-  /* System stars */
-  systemStars.forEach(s => {
+  /* ===== STARS (ETERNAL) ===== */
+  stars.forEach(s => {
+    let screenSize;
+
+    if (camera.zoom < 0.3) {
+      screenSize = 1;                 // galaxy view
+    } else if (camera.zoom < 1) {
+      screenSize = s.baseSize * 1.5;  // system reveal
+    } else {
+      screenSize = Math.min(3, s.baseSize * camera.zoom * 0.6);
+    }
+
+    ctx.fillStyle = "white";
     ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, screenSize, 0, Math.PI * 2);
     ctx.fill();
   });
 
-  /* Preview */
+  /* ===== PREVIEW ===== */
   if (previewTarget) {
-    ctx.setLineDash([6,6]);
     ctx.strokeStyle = "red";
+    ctx.setLineDash([6, 6]);
     ctx.beginPath();
     ctx.moveTo(fleet.x, fleet.y);
     ctx.lineTo(previewTarget.x, previewTarget.y);
@@ -260,15 +186,21 @@ function draw() {
     ctx.setLineDash([]);
   }
 
-  /* Fleet */
+  /* ===== FLEET ===== */
+  let fleetSize = Math.max(3, 6 / camera.zoom);
   ctx.fillStyle = "lime";
   ctx.beginPath();
-  ctx.arc(fleet.x, fleet.y, 6, 0, Math.PI * 2);
+  ctx.arc(fleet.x, fleet.y, fleetSize, 0, Math.PI * 2);
   ctx.fill();
+
+  if (fleet.state === "MOVING") {
+    ctx.fillText(
+      `MOVING (${fleet.eta.toFixed(1)}s)`,
+      fleet.x + 10,
+      fleet.y - 10
+    );
+  }
 }
 
 requestAnimationFrame(update);
 </script>
-
-</body>
-</html>
