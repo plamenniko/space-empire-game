@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Galaxy → System → Fleet (Correct)</title>
+<title>Galaxy → System → Fleet</title>
 
 <style>
 html, body {
@@ -40,169 +40,10 @@ canvas {
 
 <canvas id="canvas"></canvas>
 
-<script>
-/* ======================================================
-   CANVAS
-====================================================== */
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-resize();
-window.addEventListener("resize", resize);
-
-/* ======================================================
-   CAMERA (ZOOM = DISTANCE, NOT SCALE)
-====================================================== */
-const camera = {
-  x: 0,
-  y: 0,
-  zoom: 0.25,
-  min: 0.05,
-  max: 3
-};
-
-/* ======================================================
-   ZOOM THRESHOLDS (HARD GATES)
-====================================================== */
-const VIEW = {
-  GALAXY: 0.25,
-  SYSTEM: 0.6,
-  LOCAL: 1.4
-};
-
-/* ======================================================
-   REAL SIZES (NEVER CHANGE)
-====================================================== */
-const SIZE = {
-  GALAXY_STAR: 6,
-  SUN: 50,
-  PLANET: 10,
-  ORBIT: 80,
-  FLEET: 4
-};
-
-/* ======================================================
-   WORLD DATA
-====================================================== */
-const system = { x: 0, y: 0, planets: 4 };
-const fleet = { x: 120, y: -60 };
-
-/* ======================================================
-   BACKGROUND STARFIELD (SCREEN SPACE)
-====================================================== */
-const backgroundStars = [];
-for (let i = 0; i < 800; i++) {
-  backgroundStars.push({
-    x: Math.random(),
-    y: Math.random()
-  });
-}
-
-/* ======================================================
-   INPUT
-====================================================== */
-let dragging = false;
-let last = { x: 0, y: 0 };
-
-canvas.addEventListener("mousedown", e => {
-  dragging = true;
-  last.x = e.clientX;
-  last.y = e.clientY;
-});
-
-window.addEventListener("mouseup", () => dragging = false);
-
-window.addEventListener("mousemove", e => {
-  if (!dragging) return;
-  camera.x -= (e.clientX - last.x) / camera.zoom;
-  camera.y -= (e.clientY - last.y) / camera.zoom;
-  last.x = e.clientX;
-  last.y = e.clientY;
-});
-
-canvas.addEventListener("wheel", e => {
-  camera.zoom *= e.deltaY > 0 ? 0.9 : 1.1;
-  camera.zoom = Math.max(camera.min, Math.min(camera.max, camera.zoom));
-});
-
-/* ======================================================
-   HELPERS
-====================================================== */
-function worldToScreen(x, y) {
-  return {
-    x: (x - camera.x) * camera.zoom + canvas.width / 2,
-    y: (y - camera.y) * camera.zoom + canvas.height / 2
-  };
-}
-
-function drawCircleWorld(x, y, r, color) {
-  const p = worldToScreen(x, y);
-  ctx.beginPath();
-  ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-}
-
-/* ======================================================
-   DRAW
-====================================================== */
-function drawBackground() {
-  ctx.fillStyle = "white";
-  for (const s of backgroundStars) {
-    ctx.fillRect(
-      s.x * canvas.width,
-      s.y * canvas.height,
-      1, 1
-    );
-  }
-}
-
-function drawGalaxy() {
-  drawCircleWorld(system.x, system.y, SIZE.GALAXY_STAR, "#00ff88");
-}
-
-function drawSystem(time) {
-  // Sun
-  drawCircleWorld(system.x, system.y, SIZE.SUN, "#ffff66");
-
-  // Planets
-  for (let i = 1; i <= system.planets; i++) {
-    const a = time * 0.00015 * i;
-    drawCircleWorld(
-      system.x + Math.cos(a) * i * SIZE.ORBIT,
-      system.y + Math.sin(a) * i * SIZE.ORBIT,
-      SIZE.PLANET,
-      "#88aaff"
-    );
-  }
-}
-
-function drawFleet() {
-  drawCircleWorld(fleet.x, fleet.y, SIZE.FLEET, "#00ff00");
-}
-
-/* ======================================================
-   MAIN LOOP
-====================================================== */
-function loop(time) {
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  drawBackground();
-
-  if (camera.zoom >= VIEW.GALAXY) drawGalaxy();
-  if (camera.zoom >= VIEW.SYSTEM) drawSystem(time);
-  if (camera.zoom >= VIEW.LOCAL) drawFleet();
-
-  requestAnimationFrame(loop);
-}
-
-loop(0);
-</script>
+<!-- ORDER MATTERS -->
+<script src="js/world.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/renderer.js"></script>
 
 </body>
 </html>
