@@ -1,6 +1,28 @@
-<body style="background:red">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Space Empire Game</title>
 
-  <h1 style="color:white">INDEX LOADED</h1>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: black;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1 style="color:white; position:absolute; z-index:10">
+    INDEX LOADED
+  </h1>
 
   <canvas id="game"></canvas>
 
@@ -8,6 +30,7 @@
     console.log("INDEX SCRIPT RUNNING");
   </script>
 
+  <!-- GAME FILES -->
   <script src="js/galaxy.js"></script>
   <script src="js/systems.js"></script>
   <script src="js/fleets.js"></script>
@@ -16,3 +39,4 @@
   <script src="js/core.js"></script>
 
 </body>
+</html>
