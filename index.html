@@ -1,206 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Space Empire – Correct Scaling</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: black;
+    color: white;
+    font-family: Arial, sans-serif;
+  }
+  #ui {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 220px;
+    height: 100%;
+    background: #111;
+    border-right: 1px solid #0f0;
+    padding: 10px;
+    box-sizing: border-box;
+  }
+  canvas {
+    position: absolute;
+    left: 220px;
+    top: 0;
+  }
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <b>FLEETS</b><br><br>
+  Fleet 1<br>
+  <span style="color:#0f0">IDLE</span><br><br>
+  <b>Galaxy View</b><br>
+  Mouse Wheel = Zoom<br>
+  Drag = Pan
+</div>
+
+<canvas id="game"></canvas>
+
 <script>
 /* ==========================
    CANVAS + CAMERA
 ========================== */
-const canvas = document.getElementById("canvas");
+const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 function resize() {
-  canvas.width = window.innerWidth;
+  canvas.width = window.innerWidth - 220;
   canvas.height = window.innerHeight;
 }
-window.addEventListener("resize", resize);
 resize();
+window.addEventListener("resize", resize);
 
 const camera = {
   x: 0,
   y: 0,
-  zoom: 1
+  zoom: 0.25
 };
 
 /* ==========================
-   WORLD DATA
+   CONSTANT REAL SIZES
 ========================== */
-const stars = [];
-for (let i = 0; i < 200; i++) {
-  stars.push({
-    x: Math.random() * 20000 - 10000,
-    y: Math.random() * 20000 - 10000,
-    baseSize: Math.random() * 1.5 + 0.5
-  });
-}
+const SIZE = {
+  GALAXY_STAR: 80,     // star system icon
+  SUN: 140,            // system sun
+  PLANET: 22,          // planets
+  ORBIT_GAP: 170,
+  FLEET: 10
+};
 
 /* ==========================
-   FLEET
+   VISIBILITY THRESHOLDS
 ========================== */
-const fleet = {
+const LAYER = {
+  GALAXY: 0.03,
+  SYSTEM: 0.15,
+  LOCAL: 0.6
+};
+
+/* ==========================
+   WORLD OBJECTS
+========================== */
+const system = {
   x: 0,
   y: 0,
-  target: null,
-  speed: 120,
-  state: "IDLE",
-  eta: 0
+  planets: 4
 };
 
-let selectedFleet = fleet;
+const fleet = {
+  x: 260,
+  y: -120
+};
 
 /* ==========================
-   CENTER CAMERA
+   BACKGROUND STARS (STATIC)
 ========================== */
-function centerCameraOnFleet() {
-  camera.x = selectedFleet.x;
-  camera.y = selectedFleet.y;
-}
-centerCameraOnFleet();
-
-/* ==========================
-   INPUT
-========================== */
-let isDragging = false;
-let lastMouse = { x: 0, y: 0 };
-let previewTarget = null;
-let paused = false;
-
-/* ==========================
-   MOUSE
-========================== */
-canvas.addEventListener("mousedown", e => {
-  isDragging = true;
-  lastMouse.x = e.clientX;
-  lastMouse.y = e.clientY;
-});
-
-canvas.addEventListener("mouseup", () => isDragging = false);
-
-canvas.addEventListener("mousemove", e => {
-  if (!isDragging) return;
-  const dx = (e.clientX - lastMouse.x) / camera.zoom;
-  const dy = (e.clientY - lastMouse.y) / camera.zoom;
-  camera.x -= dx;
-  camera.y -= dy;
-  lastMouse.x = e.clientX;
-  lastMouse.y = e.clientY;
-});
-
-canvas.addEventListener("wheel", e => {
-  const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-  camera.zoom *= zoomFactor;
-  camera.zoom = Math.max(0.05, Math.min(5, camera.zoom));
-});
-
-/* ==========================
-   CLICK MOVE
-========================== */
-canvas.addEventListener("click", e => {
-  const wx = (e.clientX - canvas.width / 2) / camera.zoom + camera.x;
-  const wy = (e.clientY - canvas.height / 2) / camera.zoom + camera.y;
-
-  if (!previewTarget) {
-    previewTarget = { x: wx, y: wy };
-  } else {
-    selectedFleet.target = { ...previewTarget };
-    const dx = selectedFleet.target.x - selectedFleet.x;
-    const dy = selectedFleet.target.y - selectedFleet.y;
-    const dist = Math.hypot(dx, dy);
-    selectedFleet.eta = dist / selectedFleet.speed;
-    selectedFleet.state = "MOVING";
-    previewTarget = null;
-  }
-});
-
-/* ==========================
-   KEYBOARD
-========================== */
-window.addEventListener("keydown", e => {
-  if (e.code === "Escape") previewTarget = null;
-  if (e.code === "Space") paused = !paused;
-});
-
-/* ==========================
-   UPDATE
-========================== */
-let lastTime = performance.now();
-function update(time) {
-  const dt = (time - lastTime) / 1000;
-  lastTime = time;
-
-  if (!paused && fleet.state === "MOVING") {
-    const dx = fleet.target.x - fleet.x;
-    const dy = fleet.target.y - fleet.y;
-    const dist = Math.hypot(dx, dy);
-
-    if (dist < 1) {
-      fleet.x = fleet.target.x;
-      fleet.y = fleet.target.y;
-      fleet.target = null;
-      fleet.state = "IDLE";
-      fleet.eta = 0;
-    } else {
-      fleet.x += (dx / dist) * fleet.speed * dt;
-      fleet.y += (dy / dist) * fleet.speed * dt;
-      fleet.eta -= dt;
-    }
-  }
-
-  draw();
-  requestAnimationFrame(update);
-}
-
-/* ==========================
-   DRAW
-========================== */
-function draw() {
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  ctx.translate(canvas.width / 2, canvas.height / 2);
-  ctx.scale(camera.zoom, camera.zoom);
-  ctx.translate(-camera.x, -camera.y);
-
-  /* ===== STARS (ETERNAL) ===== */
-  stars.forEach(s => {
-    let screenSize;
-
-    if (camera.zoom < 0.3) {
-      screenSize = 1;                 // galaxy view
-    } else if (camera.zoom < 1) {
-      screenSize = s.baseSize * 1.5;  // system reveal
-    } else {
-      screenSize = Math.min(3, s.baseSize * camera.zoom * 0.6);
-    }
-
-    ctx.fillStyle = "white";
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, screenSize, 0, Math.PI * 2);
-    ctx.fill();
+const backgroundStars = [];
+for (let i = 0; i < 800; i++) {
+  backgroundStars.push({
+    x: Math.random() * 8000 - 4000,
+    y: Math.random() * 8000 - 4000
   });
+}
 
-  /* ===== PREVIEW ===== */
-  if (previewTarget) {
-    ctx.strokeStyle = "red";
-    ctx.setLineDash([6, 6]);
-    ctx.beginPath();
-    ctx.moveTo(fleet.x, fleet.y);
-    ctx.lineTo(previewTarget.x, previewTarget.y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
+/* ==========================
+   HELPERS
+========================== */
+function toScreen(x, y) {
+  return {
+    x: (x - camera.x) * camera.zoom + canvas.width / 2,
+    y: (y - camera.y) * camera.zoom + canvas.height / 2
+  };
+}
 
-  /* ===== FLEET ===== */
-  let fleetSize = Math.max(3, 6 / camera.zoom);
-  ctx.fillStyle = "lime";
+function circle(x, y, r, color) {
+  const p = toScreen(x, y);
   ctx.beginPath();
-  ctx.arc(fleet.x, fleet.y, fleetSize, 0, Math.PI * 2);
+  ctx.arc(p.x, p.y, r * camera.zoom, 0, Math.PI * 2);
+  ctx.fillStyle = color;
   ctx.fill();
+}
 
-  if (fleet.state === "MOVING") {
-    ctx.fillText(
-      `MOVING (${fleet.eta.toFixed(1)}s)`,
-      fleet.x + 10,
-      fleet.y - 10
+/* ==========================
+   DRAW PASSES
+========================== */
+function drawBackground() {
+  ctx.fillStyle = "white";
+  for (const s of backgroundStars) {
+    const p = toScreen(s.x, s.y);
+    ctx.fillRect(p.x, p.y, 1, 1);
+  }
+}
+
+function drawGalaxyLayer() {
+  circle(system.x, system.y, SIZE.GALAXY_STAR, "#00ff66");
+}
+
+function drawSystemLayer(time) {
+  // Sun
+  circle(system.x, system.y, SIZE.SUN, "#ffff55");
+
+  // Planets
+  for (let i = 1; i <= system.planets; i++) {
+    const angle = time * 0.00015 * i;
+    const dist = i * SIZE.ORBIT_GAP;
+    circle(
+      system.x + Math.cos(angle) * dist,
+      system.y + Math.sin(angle) * dist,
+      SIZE.PLANET,
+      "#66aaff"
     );
   }
 }
 
-requestAnimationFrame(update);
+function drawLocalLayer() {
+  circle(fleet.x, fleet.y, SIZE.FLEET, "#ff3333");
+}
+
+/* ==========================
+   INPUT
+========================== */
+let dragging = false;
+let last = { x: 0, y: 0 };
+
+canvas.addEventListener("mousedown", e => {
+  dragging = true;
+  last.x = e.clientX;
+  last.y = e.clientY;
+});
+window.addEventListener("mouseup", () => dragging = false);
+window.addEventListener("mousemove", e => {
+  if (!dragging) return;
+  camera.x -= (e.clientX - last.x) / camera.zoom;
+  camera.y -= (e.clientY - last.y) / camera.zoom;
+  last.x = e.clientX;
+  last.y = e.clientY;
+});
+
+canvas.addEventListener("wheel", e => {
+  camera.zoom *= e.deltaY > 0 ? 0.9 : 1.1;
+  camera.zoom = Math.max(0.01, Math.min(2, camera.zoom));
+});
+
+/* ==========================
+   MAIN LOOP
+========================== */
+function loop(time) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawBackground();
+
+  if (camera.zoom >= LAYER.GALAXY) drawGalaxyLayer();
+  if (camera.zoom >= LAYER.SYSTEM) drawSystemLayer(time);
+  if (camera.zoom >= LAYER.LOCAL) drawLocalLayer();
+
+  requestAnimationFrame(loop);
+}
+
+loop(0);
 </script>
+</body>
+</html>
