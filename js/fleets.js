@@ -1,7 +1,7 @@
 // fleets.js
 console.log("fleets.js loaded");
 
-// GLOBAL fleets (DECLARE ONCE ONLY)
+// DECLARE fleets ONCE — HERE AND ONLY HERE
 window.fleets = [
   { x: 0, y: 0 }
 ];
