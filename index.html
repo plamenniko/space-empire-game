@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Space Empire Game</title>
+
   <style>
     html, body {
       margin: 0;
@@ -17,15 +18,16 @@
 </head>
 <body>
 
-<canvas id="game"></canvas>
+  <!-- MAIN CANVAS -->
+  <canvas id="game"></canvas>
 
-<!-- ORDER MATTERS -->
-<script src="js/camera.js"></script>
-<script src="js/galaxy.js"></script>
-<script src="js/systems.js"></script>
-<script src="js/fleets.js"></script>
-<script src="js/renderer.js"></script>
-<script src="js/core.js"></script>
+  <!-- LOAD GAME FILES (ORDER MATTERS) -->
+  <script src="js/galaxy.js"></script>
+  <script src="js/systems.js"></script>
+  <script src="js/fleets.js"></script>
+  <script src="js/camera.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/core.js"></script>
 
 </body>
 </html>
