@@ -1,2 +1,25 @@
-// core.js
-console.log("core loaded");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+let lastTime = performance.now();
+
+function loop(time) {
+  const dt = (time - lastTime) / 1000;
+  lastTime = time;
+
+  updateCamera(dt);
+  updateFleets(dt);
+
+  drawScene();
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
