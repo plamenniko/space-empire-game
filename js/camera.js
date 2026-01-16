@@ -1,14 +1,6 @@
-const fleets = [
-  { x: 120, y: 0 }
-];
+// camera.js
+console.log("camera.js loaded");
 
-function updateFleets() {}
-
-function drawFleets() {
-  ctx.fillStyle = "lime";
-  fleets.forEach(f => {
-    ctx.beginPath();
-    ctx.arc(f.x, f.y, 6, 0, Math.PI*2);
-    ctx.fill();
-  });
-}
+// IMPORTANT:
+// DO NOT declare fleets here
+// We only READ from window.fleets later
