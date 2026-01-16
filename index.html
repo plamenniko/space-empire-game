@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Space Empire – Correct Scaling</title>
+<title>Galaxy → System → Fleet (Correct)</title>
 
 <style>
 html, body {
@@ -18,22 +18,15 @@ html, body {
 
 #ui {
   position: fixed;
-  left: 0;
-  top: 0;
-  width: 220px;
-  height: 100%;
-  background: #111;
-  border-right: 1px solid #0f0;
-  padding: 10px;
-  box-sizing: border-box;
+  left: 10px;
+  top: 10px;
   z-index: 10;
+  font-size: 12px;
+  opacity: 0.8;
 }
 
 canvas {
-  position: absolute;
-  left: 220px;
-  top: 0;
-  background: black;
+  display: block;
 }
 </style>
 </head>
@@ -41,132 +34,77 @@ canvas {
 <body>
 
 <div id="ui">
-  <b>FLEETS</b><br><br>
-  Fleet 1<br>
-  <span style="color:#0f0">IDLE</span><br><br>
-  <b>Galaxy View</b><br>
   Mouse Wheel = Zoom<br>
   Drag = Pan
 </div>
 
-<canvas id="game"></canvas>
+<canvas id="canvas"></canvas>
 
 <script>
-/* ==========================
-   CANVAS + CONTEXT
-========================== */
-const canvas = document.getElementById("game");
+/* ======================================================
+   CANVAS
+====================================================== */
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
 function resize() {
-  canvas.width = window.innerWidth - 220;
+  canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 }
 resize();
 window.addEventListener("resize", resize);
 
-const ctx = canvas.getContext("2d");
-if (!ctx) {
-  alert("Canvas context failed");
-}
-
-/* ==========================
-   CAMERA
-========================== */
+/* ======================================================
+   CAMERA (ZOOM = DISTANCE, NOT SCALE)
+====================================================== */
 const camera = {
   x: 0,
   y: 0,
-  zoom: 0.25
+  zoom: 0.25,
+  min: 0.05,
+  max: 3
 };
 
-/* ==========================
+/* ======================================================
+   ZOOM THRESHOLDS (HARD GATES)
+====================================================== */
+const VIEW = {
+  GALAXY: 0.25,
+  SYSTEM: 0.6,
+  LOCAL: 1.4
+};
+
+/* ======================================================
    REAL SIZES (NEVER CHANGE)
-========================== */
+====================================================== */
 const SIZE = {
-  GALAXY_STAR: 80,
-  SUN: 140,
-  PLANET: 22,
-  ORBIT_GAP: 170,
-  FLEET: 10
+  GALAXY_STAR: 6,
+  SUN: 50,
+  PLANET: 10,
+  ORBIT: 80,
+  FLEET: 4
 };
 
-/* ==========================
-   ZOOM LAYERS
-========================== */
-const LAYER = {
-  GALAXY: 0.03,
-  SYSTEM: 0.15,
-  LOCAL: 0.6
-};
-
-/* ==========================
+/* ======================================================
    WORLD DATA
-========================== */
+====================================================== */
 const system = { x: 0, y: 0, planets: 4 };
-const fleet = { x: 260, y: -120 };
+const fleet = { x: 120, y: -60 };
 
+/* ======================================================
+   BACKGROUND STARFIELD (SCREEN SPACE)
+====================================================== */
 const backgroundStars = [];
-for (let i = 0; i < 900; i++) {
+for (let i = 0; i < 800; i++) {
   backgroundStars.push({
-    x: Math.random() * 8000 - 4000,
-    y: Math.random() * 8000 - 4000
+    x: Math.random(),
+    y: Math.random()
   });
 }
 
-/* ==========================
-   HELPERS
-========================== */
-function toScreen(x, y) {
-  return {
-    x: (x - camera.x) * camera.zoom + canvas.width / 2,
-    y: (y - camera.y) * camera.zoom + canvas.height / 2
-  };
-}
-
-function circle(x, y, r, color) {
-  const p = toScreen(x, y);
-  ctx.beginPath();
-  ctx.arc(p.x, p.y, r * camera.zoom, 0, Math.PI * 2);
-  ctx.fillStyle = color;
-  ctx.fill();
-}
-
-/* ==========================
-   DRAW
-========================== */
-function drawBackground() {
-  ctx.fillStyle = "white";
-  for (const s of backgroundStars) {
-    const p = toScreen(s.x, s.y);
-    ctx.fillRect(p.x, p.y, 1, 1);
-  }
-}
-
-function drawGalaxy() {
-  circle(system.x, system.y, SIZE.GALAXY_STAR, "#00ff66");
-}
-
-function drawSystem(time) {
-  circle(system.x, system.y, SIZE.SUN, "#ffff55");
-
-  for (let i = 1; i <= system.planets; i++) {
-    const a = time * 0.00015 * i;
-    const d = i * SIZE.ORBIT_GAP;
-    circle(
-      system.x + Math.cos(a) * d,
-      system.y + Math.sin(a) * d,
-      SIZE.PLANET,
-      "#66aaff"
-    );
-  }
-}
-
-function drawFleet() {
-  circle(fleet.x, fleet.y, SIZE.FLEET, "#ff3333");
-}
-
-/* ==========================
+/* ======================================================
    INPUT
-========================== */
+====================================================== */
 let dragging = false;
 let last = { x: 0, y: 0 };
 
@@ -175,7 +113,9 @@ canvas.addEventListener("mousedown", e => {
   last.x = e.clientX;
   last.y = e.clientY;
 });
+
 window.addEventListener("mouseup", () => dragging = false);
+
 window.addEventListener("mousemove", e => {
   if (!dragging) return;
   camera.x -= (e.clientX - last.x) / camera.zoom;
@@ -183,26 +123,84 @@ window.addEventListener("mousemove", e => {
   last.x = e.clientX;
   last.y = e.clientY;
 });
+
 canvas.addEventListener("wheel", e => {
   camera.zoom *= e.deltaY > 0 ? 0.9 : 1.1;
-  camera.zoom = Math.max(0.01, Math.min(2, camera.zoom));
+  camera.zoom = Math.max(camera.min, Math.min(camera.max, camera.zoom));
 });
 
-/* ==========================
-   LOOP
-========================== */
+/* ======================================================
+   HELPERS
+====================================================== */
+function worldToScreen(x, y) {
+  return {
+    x: (x - camera.x) * camera.zoom + canvas.width / 2,
+    y: (y - camera.y) * camera.zoom + canvas.height / 2
+  };
+}
+
+function drawCircleWorld(x, y, r, color) {
+  const p = worldToScreen(x, y);
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+/* ======================================================
+   DRAW
+====================================================== */
+function drawBackground() {
+  ctx.fillStyle = "white";
+  for (const s of backgroundStars) {
+    ctx.fillRect(
+      s.x * canvas.width,
+      s.y * canvas.height,
+      1, 1
+    );
+  }
+}
+
+function drawGalaxy() {
+  drawCircleWorld(system.x, system.y, SIZE.GALAXY_STAR, "#00ff88");
+}
+
+function drawSystem(time) {
+  // Sun
+  drawCircleWorld(system.x, system.y, SIZE.SUN, "#ffff66");
+
+  // Planets
+  for (let i = 1; i <= system.planets; i++) {
+    const a = time * 0.00015 * i;
+    drawCircleWorld(
+      system.x + Math.cos(a) * i * SIZE.ORBIT,
+      system.y + Math.sin(a) * i * SIZE.ORBIT,
+      SIZE.PLANET,
+      "#88aaff"
+    );
+  }
+}
+
+function drawFleet() {
+  drawCircleWorld(fleet.x, fleet.y, SIZE.FLEET, "#00ff00");
+}
+
+/* ======================================================
+   MAIN LOOP
+====================================================== */
 function loop(time) {
   ctx.fillStyle = "black";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   drawBackground();
 
-  if (camera.zoom >= LAYER.GALAXY) drawGalaxy();
-  if (camera.zoom >= LAYER.SYSTEM) drawSystem(time);
-  if (camera.zoom >= LAYER.LOCAL) drawFleet();
+  if (camera.zoom >= VIEW.GALAXY) drawGalaxy();
+  if (camera.zoom >= VIEW.SYSTEM) drawSystem(time);
+  if (camera.zoom >= VIEW.LOCAL) drawFleet();
 
   requestAnimationFrame(loop);
 }
+
 loop(0);
 </script>
 
