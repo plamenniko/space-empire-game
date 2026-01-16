@@ -1,5 +1,9 @@
 // camera.js
 console.log("camera.js loaded");
 
-// DO NOT declare fleets here
-// fleets MUST exist ONLY in fleets.js
+// Camera state ONLY — NO fleets here
+window.camera = {
+  x: 0,
+  y: 0,
+  zoom: 1
+};
