@@ -1,15 +1,17 @@
 console.log("core.js loaded");
 
 const canvas = document.getElementById("game");
-window.canvas = canvas;
+const ctx = canvas.getContext("2d");
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-window.ctx = canvas.getContext("2d");
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
 
 function loop() {
-  render();
+  render(ctx);
   requestAnimationFrame(loop);
 }
 
