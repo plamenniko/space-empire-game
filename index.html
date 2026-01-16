@@ -12,30 +12,71 @@
   <canvas id="game"></canvas>
 
   <script>
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
+    // =========================
+  // GLOBAL SIMULATION
+  // =========================
+  const Simulation = {
+    paused: false,
+    speed: 1,
+    stars: []
+  };
 
-    function resize() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+  // =========================
+  // CANVAS SETUP
+  // =========================
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  window.addEventListener("resize", resize);
+  resize();
+
+  // =========================
+  // GALAXY GENERATION
+  // =========================
+  function generateGalaxy(count = 100) {
+    Simulation.stars = [];
+    for (let i = 0; i < count; i++) {
+      Simulation.stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height
+      });
     }
+  }
 
-    window.addEventListener("resize", resize);
-    resize();
+  generateGalaxy();
 
-    function loop() {
-      ctx.fillStyle = "black";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // =========================
+  // INPUT (PAUSE)
+  // =========================
+  window.addEventListener("keydown", e => {
+    if (e.code === "Space") {
+      Simulation.paused = !Simulation.paused;
+    }
+  });
 
-      ctx.fillStyle = "white";
+  // =========================
+  // MAIN LOOP
+  // =========================
+  function loop() {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = "white";
+    for (const star of Simulation.stars) {
       ctx.beginPath();
-      ctx.arc(canvas.width / 2, canvas.height / 2, 4, 0, Math.PI * 2);
+      ctx.arc(star.x, star.y, 2, 0, Math.PI * 2);
       ctx.fill();
-
-      requestAnimationFrame(loop);
     }
 
-    loop();
+    requestAnimationFrame(loop);
+  }
+
+  loop();
   </script>
 </body>
 </html>
