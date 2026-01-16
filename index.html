@@ -1,28 +1,93 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Galaxy View</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background: black;
-      color: white;
-      font-family: monospace;
-    }
-    canvas {
-      display: block;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Space Empire – Galaxy View</title>
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: black;
+  font-family: Arial, sans-serif;
+  color: white;
+}
+
+canvas {
+  display: block;
+}
+
+/* HUD */
+#hud {
+  position: absolute;
+  top: 10px;
+  left: 170px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Fleet panel */
+#fleetPanel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 160px;
+  height: 100%;
+  background: rgba(20,20,20,0.9);
+  border-right: 1px solid #333;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+#fleetPanel h3 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  text-align: center;
+}
+
+.fleetItem {
+  border: 1px solid #333;
+  padding: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  background: #111;
+}
+
+.fleetItem:hover {
+  background: #1a1a1a;
+}
+
+.fleetName {
+  color: #4cff4c;
+  font-weight: bold;
+}
+
+.fleetState {
+  font-size: 12px;
+  opacity: 0.8;
+}
+</style>
 </head>
 <body>
+
+<div id="fleetPanel">
+  <h3>FLEETS</h3>
+  <div id="fleetList"></div>
+</div>
+
+<div id="hud">
+  <div>🌌 Galaxy View</div>
+  <div>🟢 Fleet</div>
+  <div>⚪ Stars</div>
+  <div>Click = preview</div>
+  <div>Click again = confirm</div>
+  <div>ESC = cancel preview</div>
+  <div>SPACE = Pause</div>
+</div>
+
 <canvas id="game"></canvas>
 
 <script>
-/* =========================
-   CANVAS SETUP
-========================= */
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
@@ -33,139 +98,136 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-/* =========================
-   CAMERA
-========================= */
+/* Camera */
 const camera = {
   x: 0,
   y: 0,
   zoom: 1
 };
 
-/* =========================
-   SIMULATION STATE
-========================= */
+/* Simulation */
 let paused = false;
 
-/* =========================
-   FLEET
-========================= */
-const fleet = {
-  x: 0,
-  y: 0,
-  speed: 120,
-  target: null,
-  moving: false,
-  eta: 0
-};
-
-/* =========================
-   STARS
-========================= */
+/* Stars */
 const stars = [];
-for (let i = 0; i < 60; i++) {
+for (let i = 0; i < 40; i++) {
   stars.push({
-    x: (Math.random() - 0.5) * 4000,
-    y: (Math.random() - 0.5) * 4000
+    x: (Math.random() - 0.5) * 3000,
+    y: (Math.random() - 0.5) * 3000
   });
 }
 
-/* =========================
-   INPUT
-========================= */
-let previewTarget = null;
-
-canvas.addEventListener("click", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const sx = e.clientX - rect.left;
-  const sy = e.clientY - rect.top;
-
-  const wx = (sx - canvas.width / 2) / camera.zoom + camera.x;
-  const wy = (sy - canvas.height / 2) / camera.zoom + camera.y;
-
-  if (!previewTarget) {
-    previewTarget = { x: wx, y: wy };
-  } else {
-    fleet.target = { x: previewTarget.x, y: previewTarget.y };
-    fleet.moving = true;
-
-    const dx = fleet.target.x - fleet.x;
-    const dy = fleet.target.y - fleet.y;
-    const dist = Math.hypot(dx, dy);
-    fleet.eta = dist / fleet.speed;
-
-    previewTarget = null;
+/* Fleets (scalable) */
+const fleets = [
+  {
+    id: 1,
+    name: "Fleet 1",
+    x: 0,
+    y: 0,
+    target: null,
+    speed: 120,
+    state: "IDLE",
+    eta: 0
   }
-});
+];
 
-window.addEventListener("keydown", (e) => {
-  if (e.code === "Escape") {
-    previewTarget = null;
-  }
+/* UI references */
+const fleetList = document.getElementById("fleetList");
 
-  if (e.code === "Space") {
-    paused = !paused;
-  }
+/* Build fleet panel */
+function renderFleetPanel() {
+  fleetList.innerHTML = "";
+  fleets.forEach(fleet => {
+    const div = document.createElement("div");
+    div.className = "fleetItem";
+    div.onclick = () => centerCameraOnFleet(fleet);
 
-  /* =========================
-     STAGE 2.1 — CENTER ON FLEET
-  ========================= */
-  if (e.code === "KeyF") {
-    camera.x = fleet.x;
-    camera.y = fleet.y;
-  }
-});
+    div.innerHTML = `
+      <div class="fleetName">${fleet.name}</div>
+      <div class="fleetState">${fleet.state}</div>
+    `;
 
-/* =========================
-   UPDATE
-========================= */
-let lastTime = performance.now();
-function update(time) {
-  const dt = (time - lastTime) / 1000;
-  lastTime = time;
-
-  if (!paused && fleet.moving && fleet.target) {
-    const dx = fleet.target.x - fleet.x;
-    const dy = fleet.target.y - fleet.y;
-    const dist = Math.hypot(dx, dy);
-
-    if (dist < fleet.speed * dt) {
-      fleet.x = fleet.target.x;
-      fleet.y = fleet.target.y;
-      fleet.moving = false;
-      fleet.target = null;
-      fleet.eta = 0;
-    } else {
-      fleet.x += (dx / dist) * fleet.speed * dt;
-      fleet.y += (dy / dist) * fleet.speed * dt;
-      fleet.eta -= dt;
-    }
-  }
+    fleetList.appendChild(div);
+  });
 }
 
-/* =========================
-   DRAW
-========================= */
+function centerCameraOnFleet(fleet) {
+  camera.x = fleet.x;
+  camera.y = fleet.y;
+}
+
+renderFleetPanel();
+
+/* Input */
+let previewTarget = null;
+
+canvas.addEventListener("click", e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left - canvas.width / 2) / camera.zoom + camera.x;
+  const my = (e.clientY - rect.top - canvas.height / 2) / camera.zoom + camera.y;
+
+  if (!previewTarget) {
+    previewTarget = { x: mx, y: my };
+  } else {
+    const fleet = fleets[0];
+    fleet.target = { x: previewTarget.x, y: previewTarget.y };
+    fleet.state = "MOVING";
+    previewTarget = null;
+  }
+});
+
+window.addEventListener("keydown", e => {
+  if (e.code === "Escape") previewTarget = null;
+  if (e.code === "Space") paused = !paused;
+});
+
+/* Update */
+function update(dt) {
+  fleets.forEach(fleet => {
+    if (fleet.state === "MOVING" && fleet.target && !paused) {
+      const dx = fleet.target.x - fleet.x;
+      const dy = fleet.target.y - fleet.y;
+      const dist = Math.hypot(dx, dy);
+
+      fleet.eta = dist / fleet.speed;
+
+      if (dist < 1) {
+        fleet.x = fleet.target.x;
+        fleet.y = fleet.target.y;
+        fleet.target = null;
+        fleet.state = "IDLE";
+      } else {
+        fleet.x += (dx / dist) * fleet.speed * dt;
+        fleet.y += (dy / dist) * fleet.speed * dt;
+      }
+    }
+  });
+
+  renderFleetPanel();
+}
+
+/* Draw */
 function draw() {
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  ctx.save();
   ctx.translate(canvas.width / 2, canvas.height / 2);
   ctx.scale(camera.zoom, camera.zoom);
   ctx.translate(-camera.x, -camera.y);
 
   /* Stars */
   ctx.fillStyle = "white";
-  for (const s of stars) {
+  stars.forEach(s => {
     ctx.beginPath();
     ctx.arc(s.x, s.y, 3, 0, Math.PI * 2);
     ctx.fill();
-  }
+  });
 
-  /* Preview line */
+  /* Preview */
   if (previewTarget) {
+    const fleet = fleets[0];
     ctx.strokeStyle = "red";
-    ctx.setLineDash([6, 6]);
+    ctx.setLineDash([5, 5]);
     ctx.beginPath();
     ctx.moveTo(fleet.x, fleet.y);
     ctx.lineTo(previewTarget.x, previewTarget.y);
@@ -173,40 +235,38 @@ function draw() {
     ctx.setLineDash([]);
   }
 
-  /* Fleet */
-  ctx.fillStyle = "lime";
-  ctx.beginPath();
-  ctx.arc(fleet.x, fleet.y, 8, 0, Math.PI * 2);
-  ctx.fill();
+  /* Fleets */
+  fleets.forEach(fleet => {
+    ctx.fillStyle = "lime";
+    ctx.beginPath();
+    ctx.arc(fleet.x, fleet.y, 8, 0, Math.PI * 2);
+    ctx.fill();
 
-  /* Fleet label */
-  ctx.fillStyle = "lime";
-  ctx.font = "14px monospace";
-  const label = fleet.moving
-    ? `MOVING (${fleet.eta.toFixed(1)}s)`
-    : "IDLE";
-  ctx.fillText(label, fleet.x + 12, fleet.y - 12);
+    if (fleet.state === "MOVING") {
+      ctx.fillStyle = "lime";
+      ctx.font = "12px Arial";
+      ctx.fillText(
+        `MOVING (${fleet.eta.toFixed(1)}s)`,
+        fleet.x + 10,
+        fleet.y - 10
+      );
+    }
+  });
 
-  /* UI */
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = "white";
-  ctx.font = "14px monospace";
-  ctx.fillText("Galaxy View", 12, 20);
-  ctx.fillText("Click = preview / confirm", 12, 40);
-  ctx.fillText("ESC = cancel preview", 12, 60);
-  ctx.fillText("SPACE = pause", 12, 80);
-  ctx.fillText("F = center on fleet", 12, 100);
+  ctx.restore();
 }
 
-/* =========================
-   LOOP
-========================= */
-function loop(time) {
-  update(time);
+/* Loop */
+let last = performance.now();
+function loop(now) {
+  const dt = (now - last) / 1000;
+  last = now;
+  update(dt);
   draw();
   requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop);
+loop(last);
 </script>
+
 </body>
 </html>
