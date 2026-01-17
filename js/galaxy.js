@@ -1,19 +1,16 @@
 console.log("galaxy.js loaded");
 
-window.galaxy = {
-  layers: [
-    { stars: [], depth: 0.2 }, // far
-    { stars: [], depth: 0.5 }, // mid
-    { stars: [], depth: 1.0 }  // near
-  ]
-};
+const galaxyStars = Array.from({ length: 1200 }, () => ({
+  x: Math.random() * innerWidth,
+  y: Math.random() * innerHeight,
+  r: Math.random() * 1.5
+}));
 
-for (const layer of galaxy.layers) {
-  for (let i = 0; i < 200; i++) {
-    layer.stars.push({
-      x: Math.random() * 8000 - 4000,
-      y: Math.random() * 8000 - 4000,
-      r: Math.random() * 1.5 + 0.3
-    });
+function drawGalaxy(ctx) {
+  ctx.fillStyle = "white";
+  for (const s of galaxyStars) {
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
