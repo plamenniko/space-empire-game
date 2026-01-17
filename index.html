@@ -8,11 +8,16 @@
     html, body {
       margin: 0;
       padding: 0;
+      width: 100%;
+      height: 100%;
       background: black;
       overflow: hidden;
     }
+
     canvas {
       display: block;
+      width: 100vw;
+      height: 100vh;
     }
   </style>
 </head>
@@ -20,7 +25,6 @@
 
   <canvas id="game"></canvas>
 
-  <!-- LOAD ORDER MATTERS -->
   <script src="js/galaxy.js"></script>
   <script src="js/systems.js"></script>
   <script src="js/fleets.js"></script>
