@@ -1,9 +1,10 @@
 console.log("galaxy.js loaded");
 
-const galaxyStars = Array.from({ length: 1200 }, () => ({
-  x: Math.random() * innerWidth,
-  y: Math.random() * innerHeight,
-  r: Math.random() * 1.5
+// World-space galaxy stars (HUGE area)
+const galaxyStars = Array.from({ length: 3000 }, () => ({
+  x: (Math.random() - 0.5) * 200000,
+  y: (Math.random() - 0.5) * 200000,
+  r: Math.random() * 1.2 + 0.3
 }));
 
 function drawGalaxy(ctx) {
