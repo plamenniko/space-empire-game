@@ -4,14 +4,14 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
 }
 window.addEventListener("resize", resize);
 resize();
 
 function loop() {
-  render(ctx);
+  drawScene(ctx);
   requestAnimationFrame(loop);
 }
 
